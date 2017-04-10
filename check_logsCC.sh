@@ -130,6 +130,8 @@ else
     chmod 600 $tempdiff
 fi
 diff $logfile $oldlog | grep -v "^>" > $tempdiff
+CriticalAfterSearchExc=$tempdiff.NumberCritFound
+touch $CriticalAfterSearchExc
 }
 
 DeleteTmpFiles&UpdOldLog(){
@@ -167,6 +169,7 @@ PLUGING_PERF_DATA="$NumberCritFound"
 if [ $NumberCritFound -ne 0 ];then
     PLUGIN_OUTPUT_MSG="[$NumberCritFound] lines match critical pattern after exceptions [$EchoLines]"
     echo "$PLUGIN_OUTPUT_MSG | $PLUGING_PERF_DATA" && exit $STATE_CRITICAL
+else echo "OK, no lines matching critical pattern | $PLUGING_PERF_DATA" && exit $STATE_OK
 fi
 }
 
@@ -174,7 +177,6 @@ CheckIfSourceLogExists
 CheckIfOldLogExists
 trap DeleteTmpFiles&UpdOldLog EXIT
 CreateTempFiles
-CriticalAfterSearchExc=$tempdiff.NumberCritFound
 CheckCrit
 
 CheckExceptionsOnCritLogLines
