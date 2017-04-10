@@ -7,8 +7,11 @@ export PATH
 SCRIPT_PATH=`echo $0 | sed -e 's,[\\/][^\\/][^\\/]*$,,'`
 REVISION="0.1"
 
-
-. $SCRIPT_PATH/utils.sh
+STATE_OK=0
+STATE_WARNING=1
+STATE_CRITICAL=2
+STATE_UNKNOWN=3
+STATE_DEPENDENT=4
 
 print_usage() {
     echo "Usage: $SCRIPT_NAME -F logfile -O oldlog -q query -e exception"
