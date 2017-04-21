@@ -22,4 +22,7 @@ I need the exit code other than OK to mantain same exit code for a fixed period 
 ``` 
  icinga$ ./check_logsCC  -F /tmp/icinga2.log -O /tmp/temporalIcinga2log -q warning -e PerfdataWriter
  ``` 
- 
+ - TODO:
+   * Add WarningPatter and WarningException
+   * Add multiple options for Patters and Exceptions (parse yml?)
+   * Add sticky time
