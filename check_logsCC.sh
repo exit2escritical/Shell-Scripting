@@ -1,5 +1,6 @@
 #!/bin/sh
-
+# ./check_logsCC  -F /tmp/icinga2.log -O /tmp/temporalIcinga2log -q warning -e PerfdataWriter
+ 
 SCRIPT_NAME=`basename $0`
 PLUGING_PERF_DATA="0"
 PATH="/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin"
@@ -31,7 +32,7 @@ print_help() {
 
 # Make sure the correct number of command line
 # arguments have been supplied
-if [ $# -lt 1 ]; then
+if [ $# -lt 6 ]; then
     print_usage
     exit $STATE_UNKNOWN
 fi
@@ -71,20 +72,36 @@ while test -n "$1"; do
             oldlog=$2
             shift
             ;;
-        --query)
-            query=$2
+        --critical)
+            critical=$2
             shift
             ;;
-        -q)
-            query=$2
+        -c)
+            critical=$2
             shift
             ;;
-        --except)
-            except=$2
+        --critExcept)
+            critExcept=$2
             shift
             ;;
-        -e)
-            except=$2
+        -ce)
+            critExcept=$2
+            shift
+            ;;
+        --warning)
+            warning=$2
+            shift
+            ;;
+        -w)
+            warning=$2
+            shift
+            ;;
+        --warnExcept)
+            warnExcept=$2
+            shift
+            ;;
+        -we)
+            warnExcept=$2
             shift
             ;;
         -x)
@@ -133,54 +150,115 @@ else
     chmod 600 $tempdiff
 fi
 diff $logfile $oldlog | grep -v "^>" > $tempdiff
-CriticalAfterSearchExc=$tempdiff.NumberCritFound
-touch $CriticalAfterSearchExc
+CriticalAfterExcept=$tempdiff.NumberCritFound
+WarningAfterExcept=$tempdiff.NumberWarnFound
+tempCrit=${tempdiff}.Crit
+tempWarn=${tempdiff}.Warn
+touch $tempCrit
+touch $tempWarn
+touch $CriticalAfterExcept
+touch $WarningAfterExcept
 }
 
-DeleteTmpFiles&UpdOldLog(){
+DeleteTmpFilesAndUpdOldLog(){
         cat $logfile > $oldlog
         rm -f "$tempdiff"
-        rm -f "$CriticalAfterSearchExc"
+        rm -f "$tempCrit"
+        rm -f "$tempWarn"
+        rm -f "$CriticalAfterExcept"
+        rm -f "$WarningAfterExcept"
+
 }
 
 
 CheckCrit(){
-count=`grep -c "$query" $tempdiff`
-if [ "$count" = 0 ];then
-    PLUGIN_OUTPUT_MSG="OK, no critical lines match pattern"
-    echo "$PLUGIN_OUTPUT_MSG | $PLUGING_PERF_DATA" && exit $STATE_OK
+countCrit=`grep -c "$critical" $tempdiff`
+if [ $countCrit -gt 0 ];then
+    while read line
+    do
+        IsCrit=`echo "$line" | grep -c "$critical"`
+        if [ "$IsCrit" -eq 1 ];then
+            echo "$line" >> $tempCrit
+        fi
+    done < $tempdiff
 fi
 }
 
+CheckWarn(){
+countWarn=`grep -c "$warning" $tempdiff`
+if [ $countWarn -gt 0 ];then
+    while read line
+    do
+        IsWarn=`echo "$line" | grep -c "$warning"`
+        if [ "$IsWarn" -eq 1 ];then
+            echo "$line" >> $tempWarn
+        fi
+    done < $tempdiff
+fi
+}
+
+
 CheckExceptionsOnCritLogLines(){
-for i in $(echo `seq 1 $count`)
+for i in $(echo `seq 1 $countCrit`)
 do
-        nextline1=`echo $(($i+1))`
-        line=`sed -n ''"$nextline1"'p' $tempdiff`
-        HasExcept=`echo "$line" | grep -c "$except"|| true`
-        if [ "$HasExcept" = 0 ];then
-            echo "$line" >> $CriticalAfterSearchExc
+        line=`sed -n ''"$i"'p' $tempCrit`
+        HasCExcept=`echo "$line" | grep -c "${critExcept}" || true`
+        if [ "$HasCExcept" = 0 ];then
+            echo "$line" >> $CriticalAfterExcept
         fi
 done
 }
 
+CheckExceptionsOnWarnLogLines(){
+for i in $(echo `seq 1 $countWarn`)
+do
+        line=`sed -n ''"$i"'p' $tempWarn`
+        HasWExcept=`echo "$line" | grep -c "${warnExcept}" || true`
+        if [ "$HasWExcept" = 0 ];then
+            echo "$line" >> $WarningAfterExcept
+        fi
+done
+}
 
-CheckExitState(){
-NumberCritFound=`wc -l ${CriticalAfterSearchExc} | awk '{print $1}'`
-EchoLines="$(cat "${CriticalAfterSearchExc}" )"
+ExitCritState(){
+NumberCritFound=`wc -l ${CriticalAfterExcept} | awk '{print $1}'`
+EchoCLines="$(cat "${CriticalAfterExcept}" )"
 PLUGING_PERF_DATA="$NumberCritFound"
 if [ $NumberCritFound -ne 0 ];then
-    PLUGIN_OUTPUT_MSG="[$NumberCritFound] lines match critical pattern after exceptions [$EchoLines]"
+    PLUGIN_OUTPUT_MSG="[$NumberCritFound] lines match critical pattern after exceptions [$EchoCLines]"
     echo "$PLUGIN_OUTPUT_MSG | $PLUGING_PERF_DATA" && exit $STATE_CRITICAL
-else echo "OK, no lines matching critical pattern | $PLUGING_PERF_DATA" && exit $STATE_OK
 fi
 }
 
+ExitWarnState(){
+NumberWarnFound=`wc -l ${WarningAfterExcept} | awk '{print $1}'`
+EchoWLines="$(cat "${WarningAfterExcept}" )"
+PLUGING_PERF_DATA="$NumberWarnFound"
+if [ $NumberWarnFound -ne 0 ];then
+    PLUGIN_OUTPUT_MSG="[$NumberWarnFound] lines match warning pattern after exceptions [$EchoWLines]"
+    echo "$PLUGIN_OUTPUT_MSG | $PLUGING_PERF_DATA" && exit $STATE_WARNING
+fi
+}
+
+
 CheckIfSourceLogExists
 CheckIfOldLogExists
-trap DeleteTmpFiles&UpdOldLog EXIT
+trap DeleteTmpFilesAndUpdOldLog EXIT
 CreateTempFiles
 CheckCrit
+CheckWarn
+if [ "$countWarn" = 0 ] && [ "$countCrit" = 0 ];then
+    echo "OK | $PLUGING_PERF_DATA" && exit $STATE_OK
+else
+    if [ -z "${critExcept}" ];then 
+        cp $tempdiff $CriticalAfterException
+    elif [ -z "${warnExcept}" ];then 
+        cp $tempdiff $WarningAfterExcept
+    else 
+        CheckExceptionsOnCritLogLines
+        CheckExceptionsOnWarnLogLines
+    fi
+fi
 
-CheckExceptionsOnCritLogLines
-CheckExitState
+ExitCritState
+ExitWarnState
