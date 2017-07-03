@@ -20,9 +20,9 @@ I need the exit code other than OK to mantain same exit code for a fixed period 
 
 - Examples:
 ``` 
- icinga$ ./check_logsCC  -F /tmp/icinga2.log -O /tmp/temporalIcinga2log -q warning -e PerfdataWriter
+ icinga$ ./check_logsCC  -F /tmp/icinga2.log -O /tmp/temporalIcinga2log -c critical -w warning -ce critException -we warnException 
  ``` 
  - TODO:
-   * Add WarningPatter and WarningException
-   * Add multiple options for Patters and Exceptions (parse yml?)
+   *  -- DONE!!!!Add WarningPattern and WarningException
+   * Add multiple options for Patterns and Exceptions (parse yml?)
    * Add sticky time
