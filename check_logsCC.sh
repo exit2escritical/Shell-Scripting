@@ -1,5 +1,5 @@
 #!/bin/sh
-# ./check_logsCC  -F /tmp/icinga2.log -O /tmp/temporalIcinga2log -q warning -e PerfdataWriter
+# ./check_logsCC  -F /tmp/messages -O /tmp/temporalmessages -c criticalpattern -w warningpattern -ce criticalexception -we warningexception
  
 SCRIPT_NAME=`basename $0`
 PLUGING_PERF_DATA="0"
